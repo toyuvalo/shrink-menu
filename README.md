@@ -4,7 +4,7 @@ Right-click any image or video on Windows → **Shrink...** → instant size pic
 
 ## Install
 
-**One click:** Download `ShrinkMenu-Install.exe` and run it.
+**One click:** Download `ShrinkMenu-Install.exe` from the [latest release](../../releases/latest) and run it.
 
 **Manual:** Clone the repo, right-click `install.ps1` → Run with PowerShell.
 
@@ -54,3 +54,7 @@ build.cmd
 ```
 
 Requires `iexpress.exe` (built into Windows).
+
+## License
+
+MIT — free to use, modify, and distribute.
