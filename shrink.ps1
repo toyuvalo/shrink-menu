@@ -172,10 +172,12 @@ $pickerForm.Controls.Add($btnOverwrite)
 $pickerForm.Controls.Add($btnSaveCopy)
 $yPos += 34
 
-$script:pickedAction  = $null
-$script:imageQuality  = 82
-$script:imageFormat   = "same"
-$script:audioPreset   = $null
+$script:pickedAction       = $null
+$script:imageQuality       = 82
+$script:imageFormat        = "same"
+$script:imageMaxDim        = 0
+$script:audioPreset        = $null
+$script:videoCustomHeight  = 720
 
 # ======================================
 #  IMAGES SECTION
@@ -186,7 +188,7 @@ if ($hasImages) {
 
     $sep1 = New-Object System.Windows.Forms.Panel
     $sep1.Location = New-Object System.Drawing.Point(20, $yPos)
-    $sep1.Size = New-Object System.Drawing.Size(260, 1)
+    $sep1.Size = New-Object System.Drawing.Size(320, 1)
     $sep1.BackColor = [System.Drawing.Color]::FromArgb(55, 55, 57)
     $pickerForm.Controls.Add($sep1)
     $yPos += 8
@@ -194,7 +196,7 @@ if ($hasImages) {
     $imgHdr = New-Object System.Windows.Forms.Label
     $imgHdr.Text = "Images  ($($imagePaths.Count) file$(if($imagePaths.Count -ne 1){'s'}))"
     $imgHdr.Location = New-Object System.Drawing.Point(20, $yPos)
-    $imgHdr.Size = New-Object System.Drawing.Size(260, 18)
+    $imgHdr.Size = New-Object System.Drawing.Size(320, 18)
     $imgHdr.ForeColor = $dimColor
     $imgHdr.Font = New-Object System.Drawing.Font("Segoe UI", 8)
     $pickerForm.Controls.Add($imgHdr)
@@ -204,23 +206,23 @@ if ($hasImages) {
     $qualLabel = New-Object System.Windows.Forms.Label
     $qualLabel.Text = "Quality"
     $qualLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 4))
-    $qualLabel.Size = New-Object System.Drawing.Size(50, 20)
+    $qualLabel.Size = New-Object System.Drawing.Size(52, 20)
     $qualLabel.ForeColor = $whiteColor
     $qualLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $pickerForm.Controls.Add($qualLabel)
 
     $qualVal = New-Object System.Windows.Forms.Label
     $qualVal.Text = "82%"
-    $qualVal.Location = New-Object System.Drawing.Point(242, ($yPos + 4))
-    $qualVal.Size = New-Object System.Drawing.Size(32, 20)
+    $qualVal.Location = New-Object System.Drawing.Point(300, ($yPos + 4))
+    $qualVal.Size = New-Object System.Drawing.Size(34, 20)
     $qualVal.ForeColor = $accentColor
     $qualVal.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
     $qualVal.TextAlign = "MiddleRight"
     $pickerForm.Controls.Add($qualVal)
 
     $slider = New-Object System.Windows.Forms.TrackBar
-    $slider.Location = New-Object System.Drawing.Point(68, $yPos)
-    $slider.Size = New-Object System.Drawing.Size(170, 26)
+    $slider.Location = New-Object System.Drawing.Point(72, $yPos)
+    $slider.Size = New-Object System.Drawing.Size(224, 26)
     $slider.Minimum = 10
     $slider.Maximum = 100
     $slider.Value = 82
@@ -234,26 +236,30 @@ if ($hasImages) {
     $pickerForm.Controls.Add($slider)
     $yPos += 30
 
-    # Format row
-    $fmtLabel = New-Object System.Windows.Forms.Label
-    $fmtLabel.Text = "Format"
-    $fmtLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 4))
-    $fmtLabel.Size = New-Object System.Drawing.Size(50, 20)
-    $fmtLabel.ForeColor = $whiteColor
-    $fmtLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $pickerForm.Controls.Add($fmtLabel)
+    # Format label (own row)
+    $fmtHdrLabel = New-Object System.Windows.Forms.Label
+    $fmtHdrLabel.Text = "Format"
+    $fmtHdrLabel.Location = New-Object System.Drawing.Point(20, $yPos)
+    $fmtHdrLabel.Size = New-Object System.Drawing.Size(320, 18)
+    $fmtHdrLabel.ForeColor = $dimColor
+    $fmtHdrLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $pickerForm.Controls.Add($fmtHdrLabel)
+    $yPos += 20
 
+    # Format buttons row — 4 buttons, full width, 4px gaps
     $fmtBtns   = @{}
     $fmtOpts   = @("Same","JPEG","PNG","WebP")
     $fmtKeys   = @("same","jpg","png","webp")
-    $fmtX      = 70
+    $fmtBtnW   = 76
+    $fmtGap    = 5
+    $fmtX      = 20
 
     for ($fi = 0; $fi -lt $fmtOpts.Count; $fi++) {
         $fk   = $fmtKeys[$fi]
         $fbtn = New-Object System.Windows.Forms.Button
         $fbtn.Text = $fmtOpts[$fi]
         $fbtn.Location = New-Object System.Drawing.Point($fmtX, $yPos)
-        $fbtn.Size = New-Object System.Drawing.Size(50, 26)
+        $fbtn.Size = New-Object System.Drawing.Size($fmtBtnW, 28)
         $fbtn.FlatStyle = "Flat"
         $fbtn.FlatAppearance.BorderSize = 1
         $fbtn.Tag = $fk
@@ -261,35 +267,65 @@ if ($hasImages) {
             $fbtn.BackColor = $accentColor
             $fbtn.ForeColor = $darkText
             $fbtn.FlatAppearance.BorderColor = $accentColor
-            $fbtn.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+            $fbtn.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
         } else {
             $fbtn.BackColor = $btnColor
             $fbtn.ForeColor = $whiteColor
             $fbtn.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(70,70,70)
-            $fbtn.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+            $fbtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         }
         $fbtn.Add_Click({
             $script:imageFormat = $this.Tag
             foreach ($b in $fmtBtns.Values) {
                 $b.BackColor = $btnColor; $b.ForeColor = $whiteColor
                 $b.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(70,70,70)
-                $b.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+                $b.Font = New-Object System.Drawing.Font("Segoe UI", 9)
             }
             $this.BackColor = $accentColor; $this.ForeColor = $darkText
             $this.FlatAppearance.BorderColor = $accentColor
-            $this.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+            $this.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
         })
         $fmtBtns[$fk] = $fbtn
         $pickerForm.Controls.Add($fbtn)
-        $fmtX += 54
+        $fmtX += $fmtBtnW + $fmtGap
     }
     $yPos += 34
+
+    # Resize row — optional max dimension
+    $resizeLabel = New-Object System.Windows.Forms.Label
+    $resizeLabel.Text = "Max size"
+    $resizeLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 4))
+    $resizeLabel.Size = New-Object System.Drawing.Size(62, 20)
+    $resizeLabel.ForeColor = $whiteColor
+    $resizeLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $pickerForm.Controls.Add($resizeLabel)
+
+    $resizeNUD = New-Object System.Windows.Forms.NumericUpDown
+    $resizeNUD.Location = New-Object System.Drawing.Point(84, $yPos)
+    $resizeNUD.Size = New-Object System.Drawing.Size(88, 24)
+    $resizeNUD.Minimum = 0
+    $resizeNUD.Maximum = 8000
+    $resizeNUD.Increment = 100
+    $resizeNUD.Value = 0
+    $resizeNUD.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
+    $resizeNUD.ForeColor = $whiteColor
+    $resizeNUD.Add_ValueChanged({ $script:imageMaxDim = [int]$resizeNUD.Value })
+    $pickerForm.Controls.Add($resizeNUD)
+
+    $resizePxLabel = New-Object System.Windows.Forms.Label
+    $resizePxLabel.Text = "px  longest side  (0 = no resize)"
+    $resizePxLabel.Location = New-Object System.Drawing.Point(176, ($yPos + 4))
+    $resizePxLabel.Size = New-Object System.Drawing.Size(164, 20)
+    $resizePxLabel.ForeColor = $dimColor
+    $resizePxLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $pickerForm.Controls.Add($resizePxLabel)
+    $yPos += 32
 
     # Shrink Images button
     $shrinkImgBtn = New-Object System.Windows.Forms.Button
     $shrinkImgBtn.Text = "Shrink $($imagePaths.Count) Image$(if($imagePaths.Count -ne 1){'s'})"
     $shrinkImgBtn.Location = New-Object System.Drawing.Point(20, $yPos)
-    $shrinkImgBtn.Size = New-Object System.Drawing.Size(260, 34)
+    $shrinkImgBtn.Size = New-Object System.Drawing.Size(320, 34)
     $shrinkImgBtn.FlatStyle = "Flat"
     $shrinkImgBtn.FlatAppearance.BorderSize = 0
     $shrinkImgBtn.BackColor = [System.Drawing.Color]::FromArgb(70, 46, 14)
@@ -314,7 +350,7 @@ if ($hasAudio) {
 
     $sepAud = New-Object System.Windows.Forms.Panel
     $sepAud.Location = New-Object System.Drawing.Point(20, $yPos)
-    $sepAud.Size = New-Object System.Drawing.Size(260, 1)
+    $sepAud.Size = New-Object System.Drawing.Size(320, 1)
     $sepAud.BackColor = [System.Drawing.Color]::FromArgb(55, 55, 57)
     $pickerForm.Controls.Add($sepAud)
     $yPos += 8
@@ -322,7 +358,7 @@ if ($hasAudio) {
     $audHdr = New-Object System.Windows.Forms.Label
     $audHdr.Text = "Audio  ($($audioPaths.Count) file$(if($audioPaths.Count -ne 1){'s'}))"
     $audHdr.Location = New-Object System.Drawing.Point(20, $yPos)
-    $audHdr.Size = New-Object System.Drawing.Size(260, 18)
+    $audHdr.Size = New-Object System.Drawing.Size(320, 18)
     $audHdr.ForeColor = $dimColor
     $audHdr.Font = New-Object System.Drawing.Font("Segoe UI", 8)
     $pickerForm.Controls.Add($audHdr)
@@ -342,7 +378,7 @@ if ($hasAudio) {
         $apbtn  = New-Object System.Windows.Forms.Button
         $apbtn.Text = $ap.Label
         $apbtn.Location = New-Object System.Drawing.Point(20, $yPos)
-        $apbtn.Size = New-Object System.Drawing.Size(260, 30)
+        $apbtn.Size = New-Object System.Drawing.Size(320, 30)
         $apbtn.FlatStyle = "Flat"
         $apbtn.FlatAppearance.BorderSize = 0
         $apbtn.BackColor = $btnColor
@@ -361,7 +397,7 @@ if ($hasAudio) {
         $apSubLbl = New-Object System.Windows.Forms.Label
         $apSubLbl.Text = $apSub
         $apSubLbl.Location = New-Object System.Drawing.Point(32, ($yPos + 16))
-        $apSubLbl.Size = New-Object System.Drawing.Size(230, 14)
+        $apSubLbl.Size = New-Object System.Drawing.Size(290, 14)
         $apSubLbl.ForeColor = $dimColor
         $apSubLbl.Font = New-Object System.Drawing.Font("Segoe UI", 7)
         $pickerForm.Controls.Add($apSubLbl)
@@ -379,7 +415,7 @@ if ($hasVideos) {
 
     $sep2 = New-Object System.Windows.Forms.Panel
     $sep2.Location = New-Object System.Drawing.Point(20, $yPos)
-    $sep2.Size = New-Object System.Drawing.Size(260, 1)
+    $sep2.Size = New-Object System.Drawing.Size(320, 1)
     $sep2.BackColor = [System.Drawing.Color]::FromArgb(55, 55, 57)
     $pickerForm.Controls.Add($sep2)
     $yPos += 8
@@ -387,18 +423,18 @@ if ($hasVideos) {
     $vidHdr = New-Object System.Windows.Forms.Label
     $vidHdr.Text = "Videos  ($($videoPaths.Count) file$(if($videoPaths.Count -ne 1){'s'}))"
     $vidHdr.Location = New-Object System.Drawing.Point(20, $yPos)
-    $vidHdr.Size = New-Object System.Drawing.Size(260, 18)
+    $vidHdr.Size = New-Object System.Drawing.Size(320, 18)
     $vidHdr.ForeColor = $dimColor
     $vidHdr.Font = New-Object System.Drawing.Font("Segoe UI", 8)
     $pickerForm.Controls.Add($vidHdr)
     $yPos += 22
 
     $presets = @(
-        @{ Label = "1080p   High quality";  Key = "1080p";   Sub = "Full HD  ~50% smaller" }
-        @{ Label = "720p    Balanced";       Key = "720p";    Sub = "HD  ~70% smaller" }
-        @{ Label = "480p    Small file";     Key = "480p";    Sub = "SD  ~85% smaller" }
-        @{ Label = "Web     Fast download";  Key = "web";     Sub = "720p, fast-start optimized" }
-        @{ Label = "Discord Fits 8 MB";      Key = "discord"; Sub = "Targets Discord free limit" }
+        @{ Label = "1080p   High quality";  Key = "1080p";   Sub = "1920x? AR preserved  ~50% smaller" }
+        @{ Label = "720p    Balanced";       Key = "720p";    Sub = "1280x? AR preserved  ~70% smaller" }
+        @{ Label = "480p    Small file";     Key = "480p";    Sub = "854x?  AR preserved  ~85% smaller" }
+        @{ Label = "Web     Fast download";  Key = "web";     Sub = "720p, fast-start, AR preserved" }
+        @{ Label = "Discord Fits 8 MB";      Key = "discord"; Sub = "480p, targets 8MB, AR preserved" }
     )
 
     foreach ($preset in $presets) {
@@ -407,7 +443,7 @@ if ($hasVideos) {
         $pbtn  = New-Object System.Windows.Forms.Button
         $pbtn.Text = $preset.Label
         $pbtn.Location = New-Object System.Drawing.Point(20, $yPos)
-        $pbtn.Size = New-Object System.Drawing.Size(260, 30)
+        $pbtn.Size = New-Object System.Drawing.Size(320, 30)
         $pbtn.FlatStyle = "Flat"
         $pbtn.FlatAppearance.BorderSize = 0
         $pbtn.BackColor = $btnColor
@@ -426,16 +462,65 @@ if ($hasVideos) {
         $subLabel = New-Object System.Windows.Forms.Label
         $subLabel.Text = $pSub
         $subLabel.Location = New-Object System.Drawing.Point(32, ($yPos + 16))
-        $subLabel.Size = New-Object System.Drawing.Size(230, 14)
+        $subLabel.Size = New-Object System.Drawing.Size(290, 14)
         $subLabel.ForeColor = $dimColor
         $subLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7)
         $pickerForm.Controls.Add($subLabel)
 
         $yPos += 36
     }
+
+    # Custom height row
+    $yPos += 2
+    $customHLabel = New-Object System.Windows.Forms.Label
+    $customHLabel.Text = "Custom"
+    $customHLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 5))
+    $customHLabel.Size = New-Object System.Drawing.Size(58, 20)
+    $customHLabel.ForeColor = $whiteColor
+    $customHLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $pickerForm.Controls.Add($customHLabel)
+
+    $customNUD = New-Object System.Windows.Forms.NumericUpDown
+    $customNUD.Location = New-Object System.Drawing.Point(80, $yPos)
+    $customNUD.Size = New-Object System.Drawing.Size(80, 24)
+    $customNUD.Minimum = 144
+    $customNUD.Maximum = 4320
+    $customNUD.Increment = 10
+    $customNUD.Value = 720
+    $customNUD.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
+    $customNUD.ForeColor = $whiteColor
+    $customNUD.Add_ValueChanged({ $script:videoCustomHeight = [int]$customNUD.Value })
+    $pickerForm.Controls.Add($customNUD)
+
+    $customPxLabel = New-Object System.Windows.Forms.Label
+    $customPxLabel.Text = "px height  AR preserved"
+    $customPxLabel.Location = New-Object System.Drawing.Point(164, ($yPos + 5))
+    $customPxLabel.Size = New-Object System.Drawing.Size(160, 20)
+    $customPxLabel.ForeColor = $dimColor
+    $customPxLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $pickerForm.Controls.Add($customPxLabel)
+
+    $customBtn = New-Object System.Windows.Forms.Button
+    $customBtn.Text = "Shrink custom"
+    $customBtn.Location = New-Object System.Drawing.Point(20, ($yPos + 30))
+    $customBtn.Size = New-Object System.Drawing.Size(320, 28)
+    $customBtn.FlatStyle = "Flat"
+    $customBtn.FlatAppearance.BorderSize = 0
+    $customBtn.BackColor = $btnColor
+    $customBtn.ForeColor = $whiteColor
+    $customBtn.TextAlign = "MiddleLeft"
+    $customBtn.Padding = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+    $customBtn.Add_Click({
+        $script:pickedAction = "video:custom"
+        $pickerForm.Close()
+    })
+    $customBtn.Add_MouseEnter({ $this.BackColor = $btnHover })
+    $customBtn.Add_MouseLeave({ $this.BackColor = $btnColor })
+    $pickerForm.Controls.Add($customBtn)
+    $yPos += 64
 }
 
-$pickerForm.ClientSize = New-Object System.Drawing.Size(300, ($yPos + 10))
+$pickerForm.ClientSize = New-Object System.Drawing.Size(360, ($yPos + 10))
 [System.Windows.Forms.Application]::Run($pickerForm)
 
 if (-not $script:pickedAction) { exit 0 }
@@ -476,7 +561,16 @@ $actionLabel = if ($isImageJob) {
     }
     "Audio  $audLabel"
 } else {
-    "Videos  $videoPreset"
+    $vLabel = switch ($videoPreset) {
+        "1080p"  { "1080p" }
+        "720p"   { "720p" }
+        "480p"   { "480p" }
+        "web"    { "Web" }
+        "discord"{ "Discord" }
+        "custom" { "Custom $($script:videoCustomHeight)px" }
+        default  { $videoPreset }
+    }
+    "Videos  $vLabel  (AR preserved)"
 }
 
 # ======================================
@@ -608,17 +702,20 @@ function Start-ShrinkJob {
 
         $pinfo.FileName = "magick"
 
+        # Optional resize: -resize NxN> shrinks longest side to N, preserves AR, never enlarges
+        $resizeStr = if ($script:imageMaxDim -gt 0) { " -resize $($script:imageMaxDim)x$($script:imageMaxDim)>" } else { "" }
+
         # PNG is lossless -- map quality to color quantization
         $isPngOut = ($outExt -eq ".png")
         if ($isPngOut) {
             $pngColors = if ($qual -ge 90) { $null } elseif ($qual -ge 70) { 256 } elseif ($qual -ge 50) { 128 } else { 64 }
             if ($pngColors) {
-                $pinfo.Arguments = "`"$inPath`" -strip -colors $pngColors `"$dest`""
+                $pinfo.Arguments = "`"$inPath`"$resizeStr -strip -colors $pngColors `"$dest`""
             } else {
-                $pinfo.Arguments = "`"$inPath`" -strip `"$dest`""
+                $pinfo.Arguments = "`"$inPath`"$resizeStr -strip `"$dest`""
             }
         } else {
-            $pinfo.Arguments = "`"$inPath`" -quality $qual `"$dest`""
+            $pinfo.Arguments = "`"$inPath`"$resizeStr -quality $qual `"$dest`""
         }
 
     } elseif ($isAudioJob) {
@@ -671,6 +768,9 @@ function Start-ShrinkJob {
             }
             "web" {
                 "-i `"$inPath`" -vf `"scale=-2:720`" -c:v libx264 -crf 28 -preset fast -c:a aac -b:a 96k -movflags +faststart -y `"$dest`""
+            }
+            "custom" {
+                "-i `"$inPath`" -vf `"scale=-2:$($script:videoCustomHeight)`" -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k -movflags +faststart -y `"$dest`""
             }
             "discord" {
                 # Probe duration, calculate bitrate to hit ~7.5 MB
