@@ -1,4 +1,4 @@
-# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.1.0
+# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.3.0
 # Images: quality slider + format (JPEG/PNG/WebP/same)
 # Audio:  bitrate presets (Voice/Small/Good/HQ/Opus) -> MP3 or Opus
 # Videos: resolution/bitrate presets (1080p, 720p, 480p, Web, Discord)
@@ -77,6 +77,22 @@ if (-not $hasImages -and -not $hasAudio -and -not $hasVideos) {
         "Required tools not found:`n`n" + ($missing -join "`n") + "`n`nInstall them and add to PATH, then retry.",
         "Shrink", "OK", "Warning") | Out-Null
     $msgForm.Close(); exit 0
+}
+
+# ======================================
+#  PROBE IMAGE DIMENSIONS
+# ======================================
+
+$script:probeW = 1920
+$script:probeH = 1080
+if ($hasImages) {
+    try {
+        $probeDims = & magick identify -format "%w %h" "$($imagePaths[0])" 2>&1
+        if ($probeDims -match '(\d+)\s+(\d+)') {
+            $script:probeW = [int]$Matches[1]
+            $script:probeH = [int]$Matches[2]
+        }
+    } catch {}
 }
 
 # ======================================
@@ -175,7 +191,11 @@ $yPos += 34
 $script:pickedAction       = $null
 $script:imageQuality       = 82
 $script:imageFormat        = "same"
-$script:imageMaxDim        = 0
+$script:imageResizeMode    = "none"
+$script:imageResizePct     = 100
+$script:imageResizeW       = $script:probeW
+$script:imageResizeH       = $script:probeH
+$script:resizeUpdating     = $false
 $script:audioPreset        = $null
 $script:videoCustomHeight  = 720
 
@@ -291,34 +311,128 @@ if ($hasImages) {
     }
     $yPos += 34
 
-    # Resize row — optional max dimension
-    $resizeLabel = New-Object System.Windows.Forms.Label
-    $resizeLabel.Text = "Max size"
-    $resizeLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 4))
-    $resizeLabel.Size = New-Object System.Drawing.Size(62, 20)
-    $resizeLabel.ForeColor = $whiteColor
-    $resizeLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $pickerForm.Controls.Add($resizeLabel)
+    # ---- Smart resize row ----
+    $resizeHdrLabel = New-Object System.Windows.Forms.Label
+    $resizeHdrLabel.Text = "Resize"
+    $resizeHdrLabel.Location = New-Object System.Drawing.Point(20, ($yPos + 4))
+    $resizeHdrLabel.Size = New-Object System.Drawing.Size(52, 20)
+    $resizeHdrLabel.ForeColor = $whiteColor
+    $resizeHdrLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $pickerForm.Controls.Add($resizeHdrLabel)
 
-    $resizeNUD = New-Object System.Windows.Forms.NumericUpDown
-    $resizeNUD.Location = New-Object System.Drawing.Point(84, $yPos)
-    $resizeNUD.Size = New-Object System.Drawing.Size(88, 24)
-    $resizeNUD.Minimum = 0
-    $resizeNUD.Maximum = 8000
-    $resizeNUD.Increment = 100
-    $resizeNUD.Value = 0
-    $resizeNUD.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
-    $resizeNUD.ForeColor = $whiteColor
-    $resizeNUD.Add_ValueChanged({ $script:imageMaxDim = [int]$resizeNUD.Value })
-    $pickerForm.Controls.Add($resizeNUD)
+    $resizeChk = New-Object System.Windows.Forms.CheckBox
+    $resizeChk.Text = ""
+    $resizeChk.Location = New-Object System.Drawing.Point(72, ($yPos + 3))
+    $resizeChk.Size = New-Object System.Drawing.Size(20, 22)
+    $resizeChk.BackColor = $bgColor
+    $resizeChk.ForeColor = $whiteColor
+    $pickerForm.Controls.Add($resizeChk)
 
-    $resizePxLabel = New-Object System.Windows.Forms.Label
-    $resizePxLabel.Text = "px  longest side  (0 = no resize)"
-    $resizePxLabel.Location = New-Object System.Drawing.Point(176, ($yPos + 4))
-    $resizePxLabel.Size = New-Object System.Drawing.Size(164, 20)
-    $resizePxLabel.ForeColor = $dimColor
-    $resizePxLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-    $pickerForm.Controls.Add($resizePxLabel)
+    $dimNote = if ($imagePaths.Count -gt 1) { " (first file)" } else { "" }
+    $resizeInfoLabel = New-Object System.Windows.Forms.Label
+    $resizeInfoLabel.Text = "$($script:probeW) x $($script:probeH)$dimNote"
+    $resizeInfoLabel.Location = New-Object System.Drawing.Point(95, ($yPos + 5))
+    $resizeInfoLabel.Size = New-Object System.Drawing.Size(240, 18)
+    $resizeInfoLabel.ForeColor = $dimColor
+    $resizeInfoLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $pickerForm.Controls.Add($resizeInfoLabel)
+    $yPos += 28
+
+    # Resize fields row — W x H   %  (hidden until checkbox ticked)
+    $nudW = New-Object System.Windows.Forms.NumericUpDown
+    $nudW.Location = New-Object System.Drawing.Point(20, $yPos)
+    $nudW.Size = New-Object System.Drawing.Size(72, 24)
+    $nudW.Minimum = 1; $nudW.Maximum = 9999; $nudW.Value = $script:probeW
+    $nudW.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
+    $nudW.ForeColor = $whiteColor
+    $nudW.Visible = $false
+
+    $rxLabel = New-Object System.Windows.Forms.Label
+    $rxLabel.Text = "x"
+    $rxLabel.Location = New-Object System.Drawing.Point(96, ($yPos + 4))
+    $rxLabel.Size = New-Object System.Drawing.Size(12, 18)
+    $rxLabel.ForeColor = $dimColor
+    $rxLabel.Visible = $false
+
+    $nudH = New-Object System.Windows.Forms.NumericUpDown
+    $nudH.Location = New-Object System.Drawing.Point(110, $yPos)
+    $nudH.Size = New-Object System.Drawing.Size(72, 24)
+    $nudH.Minimum = 1; $nudH.Maximum = 9999; $nudH.Value = $script:probeH
+    $nudH.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
+    $nudH.ForeColor = $whiteColor
+    $nudH.Visible = $false
+
+    $nudPct = New-Object System.Windows.Forms.NumericUpDown
+    $nudPct.Location = New-Object System.Drawing.Point(196, $yPos)
+    $nudPct.Size = New-Object System.Drawing.Size(62, 24)
+    $nudPct.Minimum = 1; $nudPct.Maximum = 500; $nudPct.Value = 100
+    $nudPct.BackColor = [System.Drawing.Color]::FromArgb(50, 50, 52)
+    $nudPct.ForeColor = $accentColor
+    $nudPct.Visible = $false
+
+    $rpctLabel = New-Object System.Windows.Forms.Label
+    $rpctLabel.Text = "%"
+    $rpctLabel.Location = New-Object System.Drawing.Point(261, ($yPos + 4))
+    $rpctLabel.Size = New-Object System.Drawing.Size(18, 18)
+    $rpctLabel.ForeColor = $dimColor
+    $rpctLabel.Visible = $false
+
+    $nudW.Add_ValueChanged({
+        if ($script:resizeUpdating) { return }
+        $script:resizeUpdating = $true
+        $script:imageResizeMode = "absolute"
+        $script:imageResizeW = [int]$nudW.Value
+        if ($script:probeW -gt 0) {
+            $newH = [Math]::Max(1, [int][Math]::Round([int]$nudW.Value * $script:probeH / [double]$script:probeW))
+            $nudH.Value = $newH
+            $script:imageResizeH = $newH
+            $pct = [int][Math]::Round([int]$nudW.Value * 100.0 / $script:probeW)
+            $nudPct.Value = [Math]::Max(1, [Math]::Min(500, $pct))
+            $script:imageResizePct = [int]$nudPct.Value
+        }
+        $script:resizeUpdating = $false
+    })
+
+    $nudH.Add_ValueChanged({
+        if ($script:resizeUpdating) { return }
+        $script:resizeUpdating = $true
+        $script:imageResizeMode = "absolute"
+        $script:imageResizeH = [int]$nudH.Value
+        if ($script:probeH -gt 0) {
+            $newW = [Math]::Max(1, [int][Math]::Round([int]$nudH.Value * $script:probeW / [double]$script:probeH))
+            $nudW.Value = $newW
+            $script:imageResizeW = $newW
+            $pct = [int][Math]::Round([int]$nudH.Value * 100.0 / $script:probeH)
+            $nudPct.Value = [Math]::Max(1, [Math]::Min(500, $pct))
+            $script:imageResizePct = [int]$nudPct.Value
+        }
+        $script:resizeUpdating = $false
+    })
+
+    $nudPct.Add_ValueChanged({
+        if ($script:resizeUpdating) { return }
+        $script:resizeUpdating = $true
+        $script:imageResizeMode = "percent"
+        $script:imageResizePct = [int]$nudPct.Value
+        $newW = [Math]::Max(1, [int][Math]::Round($script:probeW * [int]$nudPct.Value / 100.0))
+        $newH = [Math]::Max(1, [int][Math]::Round($script:probeH * [int]$nudPct.Value / 100.0))
+        $nudW.Value = $newW; $nudH.Value = $newH
+        $script:imageResizeW = $newW; $script:imageResizeH = $newH
+        $script:resizeUpdating = $false
+    })
+
+    $resizeChk.Add_CheckedChanged({
+        $en = $resizeChk.Checked
+        $nudW.Visible = $en; $rxLabel.Visible = $en
+        $nudH.Visible = $en; $nudPct.Visible = $en; $rpctLabel.Visible = $en
+        $script:imageResizeMode = if ($en) { "percent" } else { "none" }
+    })
+
+    $pickerForm.Controls.Add($nudW)
+    $pickerForm.Controls.Add($rxLabel)
+    $pickerForm.Controls.Add($nudH)
+    $pickerForm.Controls.Add($nudPct)
+    $pickerForm.Controls.Add($rpctLabel)
     $yPos += 32
 
     # Shrink Images button
@@ -332,6 +446,30 @@ if ($hasImages) {
     $shrinkImgBtn.ForeColor = $accentColor
     $shrinkImgBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
     $shrinkImgBtn.Add_Click({
+        # Lossless warning: if input is lossless and format is "same", warn + offer JPEG/WebP
+        $losslessExts = @('.png', '.bmp', '.tiff', '.tif', '.gif')
+        $losslessCount = @($imagePaths | Where-Object { $losslessExts -contains [IO.Path]::GetExtension($_).ToLower() }).Count
+        if ($losslessCount -gt 0 -and $script:imageFormat -eq "same") {
+            $wf = New-Object System.Windows.Forms.Form
+            $wf.TopMost = $true; $wf.WindowState = "Minimized"; $wf.Show()
+            $warnResult = [System.Windows.Forms.MessageBox]::Show($wf,
+                "$losslessCount lossless file(s) (PNG/BMP/TIFF) detected.`n`nRe-encoding to the same lossless format won't reliably reduce file size.`n`nConvert to JPEG for guaranteed compression?`n`nClick Yes for JPEG, No for WebP, Cancel to abort.",
+                "Lossless Files", "YesNoCancel", "Warning")
+            $wf.Close()
+            if ($warnResult -eq "Cancel") { return }
+            $newFmt = if ($warnResult -eq "Yes") { "jpg" } else { "webp" }
+            $script:imageFormat = $newFmt
+            foreach ($b in $fmtBtns.Values) {
+                $b.BackColor = $btnColor; $b.ForeColor = $whiteColor
+                $b.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(70,70,70)
+                $b.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            }
+            if ($fmtBtns.ContainsKey($newFmt)) {
+                $fmtBtns[$newFmt].BackColor = $accentColor
+                $fmtBtns[$newFmt].ForeColor = $darkText
+                $fmtBtns[$newFmt].FlatAppearance.BorderColor = $accentColor
+            }
+        }
         $script:pickedAction = "images"
         $pickerForm.Close()
     })
@@ -702,8 +840,12 @@ function Start-ShrinkJob {
 
         $pinfo.FileName = "magick"
 
-        # Optional resize: -resize NxN> shrinks longest side to N, preserves AR, never enlarges
-        $resizeStr = if ($script:imageMaxDim -gt 0) { " -resize $($script:imageMaxDim)x$($script:imageMaxDim)>" } else { "" }
+        # Smart resize: percent keeps AR automatically; absolute uses user-set W/H (AR-linked in UI)
+        $resizeStr = switch ($script:imageResizeMode) {
+            "percent"  { " -resize $($script:imageResizePct)%" }
+            "absolute" { " -resize $($script:imageResizeW)x$($script:imageResizeH)" }
+            default    { "" }
+        }
 
         # PNG is lossless -- map quality to color quantization
         $isPngOut = ($outExt -eq ".png")
@@ -808,6 +950,7 @@ function Start-ShrinkJob {
         TmpPath  = $tmpPath
         UseTemp  = $useTemp
         OrigPath = $inPath
+        OrigSize = $file.Length
     }
 }
 
@@ -835,9 +978,14 @@ $timer.Add_Tick({
         if ($success) {
             $newSize = (Get-Item $job.OutPath).Length
             $newStr  = if ($newSize -ge 1MB) { "$([math]::Round($newSize/1MB,1)) MB" } else { "$([math]::Round($newSize/1KB,0)) KB" }
-            $listView.Items[$idx].SubItems[1].Text = "Done"
             $listView.Items[$idx].SubItems[3].Text = $newStr
-            $listView.Items[$idx].ForeColor = [System.Drawing.Color]::FromArgb(80, 210, 120)
+            if ($newSize -ge $job.OrigSize) {
+                $listView.Items[$idx].SubItems[1].Text = "No change"
+                $listView.Items[$idx].ForeColor = [System.Drawing.Color]::FromArgb(200, 160, 60)
+            } else {
+                $listView.Items[$idx].SubItems[1].Text = "Done"
+                $listView.Items[$idx].ForeColor = [System.Drawing.Color]::FromArgb(80, 210, 120)
+            }
             $script:successCount++
         } else {
             if ($job.TmpPath -and (Test-Path $job.TmpPath)) {
