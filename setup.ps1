@@ -95,7 +95,7 @@ $timer.Add_Tick({
         if (-not $scriptDir) { $scriptDir = Split-Path -Parent $MyInvocation.ScriptName }
         if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
-        $files = @("shrink.ps1","launcher.vbs","install.ps1","uninstall.ps1","setup.ps1","setup.cmd")
+        $files = @("shrink.ps1","launcher.vbs","install.ps1","uninstall.ps1","setup.ps1","setup.cmd","shrink.ico")
         $copied = 0
         foreach ($f in $files) {
             $src = Join-Path $scriptDir $f
@@ -110,7 +110,8 @@ $timer.Add_Tick({
         Set-Status "Registering context menu..." 65 ""
         $launcherPath = Join-Path $dest "launcher.vbs"
         $cmd = "wscript.exe `"$launcherPath`" `"%1`""
-        $menuIcon = "shell32.dll,23"
+        $icoPath = Join-Path $dest "shrink.ico"
+        $menuIcon = if (Test-Path $icoPath) { "$icoPath,0" } else { "shell32.dll,23" }
 
         $extensions = @(
             '.jpg','.jpeg','.png','.webp','.bmp','.tiff','.tif','.gif','.heic','.heif','.avif',

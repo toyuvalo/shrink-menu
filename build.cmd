@@ -5,6 +5,13 @@ set "SED=%TEMP%\shrinkmenu_build.sed"
 set "OUT=%~dp0ShrinkMenu-Install.exe"
 set "SRC=%~dp0"
 
+REM Regenerate icon if ImageMagick is available
+where magick >nul 2>&1
+if %errorlevel%==0 (
+    echo Generating icon...
+    powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "%~dp0create-icon.ps1" -Dest "%~dp0"
+)
+
 (
 echo [Version]
 echo Class=IEXPRESS
@@ -35,6 +42,7 @@ echo FILE2="shrink.ps1"
 echo FILE3="launcher.vbs"
 echo FILE4="install.ps1"
 echo FILE5="uninstall.ps1"
+echo FILE6="shrink.ico"
 echo [SourceFiles]
 echo SourceFiles0=%SRC%
 echo [SourceFiles0]
@@ -44,6 +52,7 @@ echo %%FILE2%%=
 echo %%FILE3%%=
 echo %%FILE4%%=
 echo %%FILE5%%=
+echo %%FILE6%%=
 ) > "%SED%"
 
 iexpress /N /Q "%SED%"

@@ -69,7 +69,8 @@ $extensions = @(
 
 $menuName  = "ShrinkMenu"
 $menuLabel = "Shrink..."
-$menuIcon  = "shell32.dll,23"
+$icoPath   = Join-Path $PSScriptRoot "shrink.ico"
+$menuIcon  = if (Test-Path $icoPath) { "$icoPath,0" } else { "shell32.dll,23" }
 $cmd       = "wscript.exe `"$launcherPath`" `"%1`""
 
 foreach ($ext in $extensions) {
