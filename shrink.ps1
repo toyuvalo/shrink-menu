@@ -1,5 +1,6 @@
-# shrink.ps1 -- Shrink images and videos with GUI  v1.0.0
+# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.1.0
 # Images: quality slider + format (JPEG/PNG/WebP/same)
+# Audio:  bitrate presets (Voice/Small/Good/HQ/Opus) -> MP3 or Opus
 # Videos: resolution/bitrate presets (1080p, 720p, 480p, Web, Discord)
 
 param(
@@ -26,6 +27,7 @@ if (Get-Command ffprobe -ErrorAction SilentlyContinue) { $ffprobeCmd = "ffprobe"
 # ======================================
 
 $imageExts = @('.jpg','.jpeg','.png','.webp','.bmp','.tiff','.tif','.gif','.heic','.heif','.avif')
+$audioExts = @('.mp3','.wav','.flac','.aac','.ogg','.wma','.m4a','.opus','.aiff','.ape','.m4b','.weba')
 $videoExts = @('.mp4','.mkv','.avi','.mov','.webm','.wmv','.flv','.ts','.m4v','.3gp')
 
 # ======================================
@@ -45,27 +47,30 @@ if ($ListFile -and (Test-Path $ListFile)) {
 if ($allPaths.Count -eq 0) { exit 0 }
 
 $imagePaths = @($allPaths | Where-Object { $imageExts -contains ([IO.Path]::GetExtension($_).ToLower()) })
+$audioPaths = @($allPaths | Where-Object { $audioExts -contains ([IO.Path]::GetExtension($_).ToLower()) })
 $videoPaths = @($allPaths | Where-Object { $videoExts -contains ([IO.Path]::GetExtension($_).ToLower()) })
 
 $hasImages = ($magickCmd -ne $null) -and ($imagePaths.Count -gt 0)
+$hasAudio  = ($ffmpegCmd -ne $null) -and ($audioPaths.Count -gt 0)
 $hasVideos = ($ffmpegCmd -ne $null) -and ($videoPaths.Count -gt 0)
 
 # Error: no supported files at all
-if ($imagePaths.Count -eq 0 -and $videoPaths.Count -eq 0) {
+if ($imagePaths.Count -eq 0 -and $audioPaths.Count -eq 0 -and $videoPaths.Count -eq 0) {
     $allExts = (@($allPaths | ForEach-Object { [IO.Path]::GetExtension($_).ToLower() } | Sort-Object -Unique)) -join ", "
     $msgForm = New-Object System.Windows.Forms.Form
     $msgForm.TopMost = $true; $msgForm.WindowState = "Minimized"; $msgForm.Show()
     [System.Windows.Forms.MessageBox]::Show($msgForm,
-        "No supported files.`n`nSupported image types: jpg png webp bmp tiff gif heic avif`nSupported video types: mp4 mkv avi mov webm wmv flv ts`n`nSelected extensions: $allExts",
+        "No supported files.`n`nImages: jpg png webp bmp tiff gif heic avif`nAudio:  mp3 wav flac aac ogg wma m4a opus aiff ape`nVideo:  mp4 mkv avi mov webm wmv flv ts`n`nSelected: $allExts",
         "Shrink", "OK", "Information") | Out-Null
     $msgForm.Close(); exit 0
 }
 
 # Error: tools missing
-if (-not $hasImages -and -not $hasVideos) {
+if (-not $hasImages -and -not $hasAudio -and -not $hasVideos) {
     $missing = @()
-    if ($imagePaths.Count -gt 0 -and -not $magickCmd)  { $missing += "ImageMagick  (images -- imagemagick.org)" }
-    if ($videoPaths.Count -gt 0 -and -not $ffmpegCmd)   { $missing += "ffmpeg  (videos -- ffmpeg.org)" }
+    if ($imagePaths.Count -gt 0 -and -not $magickCmd) { $missing += "ImageMagick  (images -- imagemagick.org)" }
+    if ($audioPaths.Count -gt 0 -and -not $ffmpegCmd) { $missing += "ffmpeg  (audio -- ffmpeg.org)" }
+    if ($videoPaths.Count -gt 0 -and -not $ffmpegCmd) { $missing += "ffmpeg  (videos -- ffmpeg.org)" }
     $msgForm = New-Object System.Windows.Forms.Form
     $msgForm.TopMost = $true; $msgForm.WindowState = "Minimized"; $msgForm.Show()
     [System.Windows.Forms.MessageBox]::Show($msgForm,
@@ -170,6 +175,7 @@ $yPos += 34
 $script:pickedAction  = $null
 $script:imageQuality  = 82
 $script:imageFormat   = "same"
+$script:audioPreset   = $null
 
 # ======================================
 #  IMAGES SECTION
@@ -300,6 +306,71 @@ if ($hasImages) {
 }
 
 # ======================================
+#  AUDIO SECTION
+# ======================================
+
+if ($hasAudio) {
+    $yPos += 4
+
+    $sepAud = New-Object System.Windows.Forms.Panel
+    $sepAud.Location = New-Object System.Drawing.Point(20, $yPos)
+    $sepAud.Size = New-Object System.Drawing.Size(260, 1)
+    $sepAud.BackColor = [System.Drawing.Color]::FromArgb(55, 55, 57)
+    $pickerForm.Controls.Add($sepAud)
+    $yPos += 8
+
+    $audHdr = New-Object System.Windows.Forms.Label
+    $audHdr.Text = "Audio  ($($audioPaths.Count) file$(if($audioPaths.Count -ne 1){'s'}))"
+    $audHdr.Location = New-Object System.Drawing.Point(20, $yPos)
+    $audHdr.Size = New-Object System.Drawing.Size(260, 18)
+    $audHdr.ForeColor = $dimColor
+    $audHdr.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $pickerForm.Controls.Add($audHdr)
+    $yPos += 22
+
+    $audioPresets = @(
+        @{ Label = "Voice    64 kbps mono";   Key = "voice"; Sub = "voice memos, podcasts -- tiny" }
+        @{ Label = "Small   128 kbps";         Key = "small"; Sub = "general use  ~70% smaller than WAV/FLAC" }
+        @{ Label = "Good    192 kbps";         Key = "good";  Sub = "music quality" }
+        @{ Label = "HQ      320 kbps";         Key = "hq";    Sub = "max MP3 -- best for lossless source" }
+        @{ Label = "Opus     96 kbps";         Key = "opus";  Sub = "modern codec, very small  -> .opus" }
+    )
+
+    foreach ($ap in $audioPresets) {
+        $apKey  = $ap.Key
+        $apSub  = $ap.Sub
+        $apbtn  = New-Object System.Windows.Forms.Button
+        $apbtn.Text = $ap.Label
+        $apbtn.Location = New-Object System.Drawing.Point(20, $yPos)
+        $apbtn.Size = New-Object System.Drawing.Size(260, 30)
+        $apbtn.FlatStyle = "Flat"
+        $apbtn.FlatAppearance.BorderSize = 0
+        $apbtn.BackColor = $btnColor
+        $apbtn.ForeColor = $whiteColor
+        $apbtn.TextAlign = "MiddleLeft"
+        $apbtn.Padding = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+        $apbtn.Tag = $apKey
+        $apbtn.Add_Click({
+            $script:pickedAction = "audio:" + $this.Tag
+            $pickerForm.Close()
+        })
+        $apbtn.Add_MouseEnter({ $this.BackColor = $btnHover })
+        $apbtn.Add_MouseLeave({ $this.BackColor = $btnColor })
+        $pickerForm.Controls.Add($apbtn)
+
+        $apSubLbl = New-Object System.Windows.Forms.Label
+        $apSubLbl.Text = $apSub
+        $apSubLbl.Location = New-Object System.Drawing.Point(32, ($yPos + 16))
+        $apSubLbl.Size = New-Object System.Drawing.Size(230, 14)
+        $apSubLbl.ForeColor = $dimColor
+        $apSubLbl.Font = New-Object System.Drawing.Font("Segoe UI", 7)
+        $pickerForm.Controls.Add($apSubLbl)
+
+        $yPos += 36
+    }
+}
+
+# ======================================
 #  VIDEOS SECTION
 # ======================================
 
@@ -370,7 +441,9 @@ $pickerForm.ClientSize = New-Object System.Drawing.Size(300, ($yPos + 10))
 if (-not $script:pickedAction) { exit 0 }
 
 $isImageJob  = ($script:pickedAction -eq "images")
+$isAudioJob  = ($script:pickedAction -like "audio:*")
 $isVideoJob  = ($script:pickedAction -like "video:*")
+$audioPreset = if ($isAudioJob) { $script:pickedAction.Substring(6) } else { $null }
 $videoPreset = if ($isVideoJob) { $script:pickedAction.Substring(6) } else { $null }
 $saveMode    = $script:saveMode
 
@@ -381,6 +454,8 @@ $saveMode    = $script:saveMode
 $files = @()
 if ($isImageJob) {
     foreach ($p in $imagePaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
+} elseif ($isAudioJob) {
+    foreach ($p in $audioPaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
 } elseif ($isVideoJob) {
     foreach ($p in $videoPaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
 }
@@ -390,6 +465,16 @@ if ($files.Count -eq 0) { exit 0 }
 $actionLabel = if ($isImageJob) {
     $fmtNote = if ($script:imageFormat -ne "same") { " -> " + $script:imageFormat.ToUpper() } else { "" }
     "Images  Quality $($script:imageQuality)%$fmtNote"
+} elseif ($isAudioJob) {
+    $audLabel = switch ($audioPreset) {
+        "voice" { "Voice  64kbps mono MP3" }
+        "small" { "Small  128kbps MP3" }
+        "good"  { "Good   192kbps MP3" }
+        "hq"    { "HQ     320kbps MP3" }
+        "opus"  { "Opus   96kbps .opus" }
+        default { "Audio  $audioPreset" }
+    }
+    "Audio  $audLabel"
 } else {
     "Videos  $videoPreset"
 }
@@ -534,6 +619,28 @@ function Start-ShrinkJob {
             }
         } else {
             $pinfo.Arguments = "`"$inPath`" -quality $qual `"$dest`""
+        }
+
+    } elseif ($isAudioJob) {
+        $outExt3 = if ($audioPreset -eq "opus") { ".opus" } else { ".mp3" }
+
+        if ($saveMode -eq "overwrite") {
+            $tmpPath = Join-Path $env:TEMP "shrink_aud_${Idx}_tmp${outExt3}"
+            $outPath = Join-Path $dir "$base$outExt3"
+            $useTemp = $true
+            $dest    = $tmpPath
+        } else {
+            $outPath = Join-Path $dir "${base}_shrunk${outExt3}"
+            $dest    = $outPath
+        }
+
+        $pinfo.FileName = "ffmpeg"
+        $pinfo.Arguments = switch ($audioPreset) {
+            "voice" { "-i `"$inPath`" -c:a libmp3lame -b:a 64k -ac 1 -y `"$dest`"" }
+            "small" { "-i `"$inPath`" -c:a libmp3lame -b:a 128k -y `"$dest`"" }
+            "good"  { "-i `"$inPath`" -c:a libmp3lame -b:a 192k -y `"$dest`"" }
+            "hq"    { "-i `"$inPath`" -c:a libmp3lame -b:a 320k -y `"$dest`"" }
+            "opus"  { "-i `"$inPath`" -c:a libopus -b:a 96k -y `"$dest`"" }
         }
 
     } elseif ($isVideoJob) {

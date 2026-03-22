@@ -63,6 +63,7 @@ Write-Host "Registering context menu entries..." -ForegroundColor White
 
 $extensions = @(
     '.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.heic', '.heif', '.avif',
+    '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus', '.aiff', '.ape', '.m4b', '.weba',
     '.mp4', '.mkv', '.avi', '.mov', '.webm', '.wmv', '.flv', '.ts', '.m4v', '.3gp'
 )
 
@@ -87,8 +88,9 @@ Write-Host "  Registered $($extensions.Count) file types" -ForegroundColor Green
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Right-click any image or video to see 'Shrink...'" -ForegroundColor White
+Write-Host "Right-click any image, audio, or video to see 'Shrink...'" -ForegroundColor White
 Write-Host "  Images: jpg jpeg png webp bmp tiff gif heic heif avif" -ForegroundColor Gray
+Write-Host "  Audio:  mp3 wav flac aac ogg wma m4a opus aiff ape" -ForegroundColor Gray
 Write-Host "  Videos: mp4 mkv avi mov webm wmv flv ts m4v 3gp" -ForegroundColor Gray
 Write-Host ""
 Write-Host "If the menu doesn't appear, restart Explorer:" -ForegroundColor Yellow
