@@ -2,6 +2,8 @@
 
 Right-click any image, audio, or video on Windows → **Shrink...** → instant size picker GUI.
 
+> **Platform:** Windows only. The compression engine is PowerShell-native and relies on Windows shell integration. A Python-based cross-platform port (macOS + Linux) is planned.
+
 ## Screenshots
 
 | Picker | In progress | Done |
