@@ -10,7 +10,7 @@ Right-click any image, audio, or video on Windows → **Shrink...** → instant 
 
 ## Install
 
-**One click:** Download `ShrinkMenu-Install.exe` from the [latest release](../../releases/latest) and run it.
+**One click:** Download **[ShrinkMenu-Install.exe](../../releases/latest/download/ShrinkMenu-Install.exe)** and run it. No admin required.
 
 **Manual:** Clone the repo, right-click `install.ps1` → Run with PowerShell.
 
