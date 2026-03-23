@@ -6,6 +6,7 @@ Write-Host ""
 
 $extensions = @(
     '.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.heic', '.heif', '.avif',
+    '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus', '.aiff', '.ape', '.m4b', '.weba',
     '.mp4', '.mkv', '.avi', '.mov', '.webm', '.wmv', '.flv', '.ts', '.m4v', '.3gp'
 )
 
