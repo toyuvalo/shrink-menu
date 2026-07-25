@@ -1,4 +1,7 @@
-# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.3.0
+# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.4.1
+# 2026-07-25 -- file names with a smart quote / accent are no longer skipped:
+#   launcher.vbs now hands over a UTF-8 list (was ANSI, read back as UTF-8), and
+#   every path operation uses -LiteralPath ('[' / ']' were read as wildcards).
 # Images: quality slider + format (JPEG/PNG/WebP/same)
 # Audio:  bitrate presets (Voice/Small/Good/HQ/Opus) -> MP3 or Opus
 # Videos: resolution/bitrate presets (1080p, 720p, 480p, Web, Discord)
@@ -35,11 +38,15 @@ $videoExts = @('.mp4','.mkv','.avi','.mov','.webm','.wmv','.flv','.ts','.m4v','.
 # ======================================
 
 $allPaths = @()
-if ($ListFile -and (Test-Path $ListFile)) {
-    $allPaths = @(Get-Content $ListFile -Encoding UTF8 |
+if ($ListFile -and (Test-Path -LiteralPath $ListFile)) {
+    # ReadAllLines honours the BOM (UTF-8 from launcher.vbs) and defaults to
+    # UTF-8. Get-Content -Encoding UTF8 mangled every non-ASCII character the
+    # launcher used to write in the system codepage.
+    $listFullPath = (Resolve-Path -LiteralPath $ListFile).Path
+    $allPaths = @([System.IO.File]::ReadAllLines($listFullPath) |
         Where-Object { $_.Trim() -ne "" } |
         ForEach-Object { $_.Trim() })
-    Remove-Item $ListFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $listFullPath -Force -ErrorAction SilentlyContinue
 } elseif ($Path) {
     $allPaths = @($Path)
 }
@@ -508,6 +515,8 @@ if ($hasAudio) {
         @{ Label = "Good    192 kbps";         Key = "good";  Sub = "music quality" }
         @{ Label = "HQ      320 kbps";         Key = "hq";    Sub = "max MP3 -- best for lossless source" }
         @{ Label = "Opus     96 kbps";         Key = "opus";  Sub = "modern codec, very small  -> .opus" }
+        @{ Label = "WAV 24-bit  lossless";     Key = "wav24"; Sub = "downconvert from 32-bit float -- delivery format" }
+        @{ Label = "WAV 16-bit  lossless";     Key = "wav16"; Sub = "downconvert for max compatibility (CD)" }
     )
 
     foreach ($ap in $audioPresets) {
@@ -676,11 +685,12 @@ $saveMode    = $script:saveMode
 
 $files = @()
 if ($isImageJob) {
-    foreach ($p in $imagePaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
+    # -LiteralPath throughout: '[' / ']' in a file name are wildcards otherwise.
+    foreach ($p in $imagePaths) { if (Test-Path -LiteralPath $p -PathType Leaf) { $files += Get-Item -LiteralPath $p } }
 } elseif ($isAudioJob) {
-    foreach ($p in $audioPaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
+    foreach ($p in $audioPaths) { if (Test-Path -LiteralPath $p -PathType Leaf) { $files += Get-Item -LiteralPath $p } }
 } elseif ($isVideoJob) {
-    foreach ($p in $videoPaths) { if (Test-Path $p -PathType Leaf) { $files += Get-Item $p } }
+    foreach ($p in $videoPaths) { if (Test-Path -LiteralPath $p -PathType Leaf) { $files += Get-Item -LiteralPath $p } }
 }
 
 if ($files.Count -eq 0) { exit 0 }
@@ -695,6 +705,8 @@ $actionLabel = if ($isImageJob) {
         "good"  { "Good   192kbps MP3" }
         "hq"    { "HQ     320kbps MP3" }
         "opus"  { "Opus   96kbps .opus" }
+        "wav24" { "WAV    24-bit PCM lossless" }
+        "wav16" { "WAV    16-bit PCM lossless" }
         default { "Audio  $audioPreset" }
     }
     "Audio  $audLabel"
@@ -861,7 +873,12 @@ function Start-ShrinkJob {
         }
 
     } elseif ($isAudioJob) {
-        $outExt3 = if ($audioPreset -eq "opus") { ".opus" } else { ".mp3" }
+        $outExt3 = switch ($audioPreset) {
+            "opus"  { ".opus" }
+            "wav24" { ".wav" }
+            "wav16" { ".wav" }
+            default { ".mp3" }
+        }
 
         if ($saveMode -eq "overwrite") {
             $tmpPath = Join-Path $env:TEMP "shrink_aud_${Idx}_tmp${outExt3}"
@@ -880,6 +897,8 @@ function Start-ShrinkJob {
             "good"  { "-i `"$inPath`" -c:a libmp3lame -b:a 192k -y `"$dest`"" }
             "hq"    { "-i `"$inPath`" -c:a libmp3lame -b:a 320k -y `"$dest`"" }
             "opus"  { "-i `"$inPath`" -c:a libopus -b:a 96k -y `"$dest`"" }
+            "wav24" { "-i `"$inPath`" -c:a pcm_s24le -vn -y `"$dest`"" }
+            "wav16" { "-i `"$inPath`" -c:a pcm_s16le -vn -y `"$dest`"" }
         }
 
     } elseif ($isVideoJob) {
@@ -965,18 +984,18 @@ $timer.Add_Tick({
         $idx     = $job.Idx
         $success = $false
 
-        if ($job.UseTemp -and $job.Process.ExitCode -eq 0 -and (Test-Path $job.TmpPath)) {
+        if ($job.UseTemp -and $job.Process.ExitCode -eq 0 -and (Test-Path -LiteralPath $job.TmpPath)) {
             try {
-                if (Test-Path $job.OutPath) { Remove-Item $job.OutPath -Force -ErrorAction Stop }
-                Move-Item $job.TmpPath $job.OutPath -Force -ErrorAction Stop
-                $success = Test-Path $job.OutPath
+                if (Test-Path -LiteralPath $job.OutPath) { Remove-Item -LiteralPath $job.OutPath -Force -ErrorAction Stop }
+                Move-Item -LiteralPath $job.TmpPath -Destination $job.OutPath -Force -ErrorAction Stop
+                $success = Test-Path -LiteralPath $job.OutPath
             } catch { $success = $false }
         } else {
-            $success = ($job.Process.ExitCode -eq 0) -and ($job.OutPath -ne $null) -and (Test-Path $job.OutPath)
+            $success = ($job.Process.ExitCode -eq 0) -and ($job.OutPath -ne $null) -and (Test-Path -LiteralPath $job.OutPath)
         }
 
         if ($success) {
-            $newSize = (Get-Item $job.OutPath).Length
+            $newSize = (Get-Item -LiteralPath $job.OutPath).Length
             $newStr  = if ($newSize -ge 1MB) { "$([math]::Round($newSize/1MB,1)) MB" } else { "$([math]::Round($newSize/1KB,0)) KB" }
             $listView.Items[$idx].SubItems[3].Text = $newStr
             if ($newSize -ge $job.OrigSize) {
@@ -988,8 +1007,8 @@ $timer.Add_Tick({
             }
             $script:successCount++
         } else {
-            if ($job.TmpPath -and (Test-Path $job.TmpPath)) {
-                Remove-Item $job.TmpPath -Force -ErrorAction SilentlyContinue
+            if ($job.TmpPath -and (Test-Path -LiteralPath $job.TmpPath)) {
+                Remove-Item -LiteralPath $job.TmpPath -Force -ErrorAction SilentlyContinue
             }
             $listView.Items[$idx].SubItems[1].Text = "Failed"
             $listView.Items[$idx].ForeColor = [System.Drawing.Color]::FromArgb(255, 80, 70)
@@ -1031,8 +1050,8 @@ $form.Add_FormClosing({
     $timer.Stop()
     if ($script:runningJob -ne $null) {
         try { $script:runningJob.Process.Kill() } catch {}
-        if ($script:runningJob.TmpPath -and (Test-Path $script:runningJob.TmpPath)) {
-            Remove-Item $script:runningJob.TmpPath -Force -ErrorAction SilentlyContinue
+        if ($script:runningJob.TmpPath -and (Test-Path -LiteralPath $script:runningJob.TmpPath)) {
+            Remove-Item -LiteralPath $script:runningJob.TmpPath -Force -ErrorAction SilentlyContinue
         }
     }
 })

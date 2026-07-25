@@ -34,6 +34,8 @@ Right-click any image, audio, or video on Windows → **Shrink...** → instant 
 | Good | 192 kbps MP3 | music quality |
 | HQ | 320 kbps MP3 | max MP3, best for lossless source |
 | Opus | 96 kbps .opus | modern codec, smallest size |
+| WAV 24-bit | PCM lossless .wav | downconvert from 32-bit float — delivery format |
+| WAV 16-bit | PCM lossless .wav | downconvert for max compatibility (CD) |
 
 ### Videos (requires ffmpeg)
 | Preset | Resolution | Notes |
@@ -46,6 +48,10 @@ Right-click any image, audio, or video on Windows → **Shrink...** → instant 
 | Custom | any height | enter exact px height, width auto-calculated |
 
 Before/after file size shown per file in the progress window.
+
+### Any file name
+
+Names with smart quotes (`’`), accents, `[brackets]` or `%` are handled correctly. Earlier versions silently skipped them — the Explorer file list was handed over in the system codepage and read back as UTF-8, so those names stopped resolving. Fixed in v1.4.1.
 
 ## Requirements
 
