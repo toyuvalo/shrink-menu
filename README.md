@@ -58,7 +58,7 @@ Names with smart quotes (`’`), accents, `[brackets]` or `%` are handled correc
 - ImageMagick 7+ — [imagemagick.org](https://imagemagick.org/script/download.php#windows)
 - ffmpeg — [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/)
 
-Both must be on your system PATH. The installer checks and warns if they're missing.
+The installer handles both. A copy already on your PATH is used as-is. If one is missing, the installer downloads it (about 35 MB for ffmpeg, 12 MB for ImageMagick), checks its SHA-256, puts it in `%LOCALAPPDATA%\Programs\DVLCE\<tool>` and adds that folder to your user PATH. It takes the newest release from GitHub: ffmpeg from [GyanD/codexffmpeg](https://github.com/GyanD/codexffmpeg) (gyan.dev's own mirror), ImageMagick from [ImageMagick/ImageMagick](https://github.com/ImageMagick/ImageMagick/releases). FFmpeg Convert and Doc Convert use the same shared folder, so each tool is downloaded once. Uninstalling removes a shared copy only when no other of these tools still needs it.
 
 ## Integration
 
@@ -81,6 +81,10 @@ build.cmd
 ```
 
 Requires Inno Setup 6 (`winget install JRSoftware.InnoSetup`). The launcher is compiled with the in-box C# compiler. The build signs everything with Azure Artifact Signing; set `NOSIGN=1` to build unsigned. ImageMagick on PATH regenerates the icon automatically.
+
+### Testing the dependency download
+
+`installer\dvlce-deps.iss` holds the download code (an identical copy is in each tool repo). `test\deps-harness.iss` is a test installer with its own AppId and no menu entries. It ignores the PATH, so it always downloads. Compile it with `ISCC.exe test\deps-harness.iss`, run it, and check `%LOCALAPPDATA%\Programs\DVLCE`. Its uninstall removes the folders, unless `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{00D3B5A1-7E2C-4F18-9A6B-DE9500000002}_is1` exists (a stand-in for another tool that still needs them).
 
 ## More tools like this
 

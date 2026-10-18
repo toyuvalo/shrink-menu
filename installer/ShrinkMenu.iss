@@ -1,14 +1,18 @@
-; ShrinkMenu.iss -- Inno Setup script for ShrinkMenu-Install.exe (v1.5.0)
+; ShrinkMenu.iss -- Inno Setup script for ShrinkMenu-Install.exe (v1.5.1)
 ; Replaces the IExpress package. IExpress extracted to %TEMP% and ran
 ; setup.cmd -> powershell -ExecutionPolicy Bypass, the same chain malware
 ; droppers use, and antivirus flags it. This installer runs no scripts:
-; it copies files and writes the HKCU context-menu keys itself.
+; it copies files and writes the HKCU context-menu keys itself. v1.5.1: when
+; ffmpeg or ImageMagick is not on the PATH, it downloads them (dvlce-deps.iss).
 ; Build: build.cmd (needs Inno Setup 6, ISCC.exe).
 
-#define AppVersion "1.5.0"
+#define AppVersion "1.5.1"
+#define AppGuid "9C4D2E7B-1A6F-4B83-8E25-6F3B0A9D1C57"
+#define NeedFFmpeg
+#define NeedMagick
 
 [Setup]
-AppId={{9C4D2E7B-1A6F-4B83-8E25-6F3B0A9D1C57}
+AppId={{{#AppGuid}}
 AppName=Shrink Menu
 AppVersion={#AppVersion}
 AppPublisher=DVLCE
@@ -30,6 +34,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ChangesAssociations=yes
+ChangesEnvironment=yes
 #ifdef SIGN
 ; build.cmd passes /DSIGN and /Sazsign=<command> (Azure Artifact Signing).
 SignTool=azsign
@@ -91,3 +96,15 @@ Type: files; Name: "{app}\uninstall.ps1"
 #emit Entry(".ts")
 #emit Entry(".m4v")
 #emit Entry(".3gp")
+
+#include "dvlce-deps.iss"
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then InstallDeps();
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then UninstallDeps();
+end;

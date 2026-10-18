@@ -21,8 +21,8 @@ using System.Threading;
 [assembly: AssemblyProduct("Shrink Menu")]
 [assembly: AssemblyCompany("DVLCE")]
 [assembly: AssemblyCopyright("MIT with Commons Clause")]
-[assembly: AssemblyVersion("1.5.0.0")]
-[assembly: AssemblyFileVersion("1.5.0.0")]
+[assembly: AssemblyVersion("1.5.1.0")]
+[assembly: AssemblyFileVersion("1.5.1.0")]
 
 static class ShrinkMenuLauncher
 {

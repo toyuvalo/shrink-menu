@@ -1,4 +1,5 @@
-# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.5.0
+# shrink.ps1 -- Shrink images, audio, and videos with GUI  v1.5.1
+# 2026-10-18 -- v1.5.1: the installer downloads ffmpeg / ImageMagick when they are missing.
 # 2026-07-25 -- file names with a smart quote / accent are no longer skipped:
 #   launcher.vbs now hands over a UTF-8 list (was ANSI, read back as UTF-8), and
 #   every path operation uses -LiteralPath ('[' / ']' were read as wildcards).
