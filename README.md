@@ -12,7 +12,7 @@ Right-click any image, audio, or video on Windows → **Shrink...** → instant 
 
 ## Install
 
-**One click:** Download **[ShrinkMenu-Install.exe](../../releases/latest/download/ShrinkMenu-Install.exe)** and run it. No admin required.
+**One click:** Download **[ShrinkMenu-Install.exe](../../releases/latest/download/ShrinkMenu-Install.exe)** and run it. No admin required. The installer (Inno Setup, per-user) is code-signed by Yuval Olsha, runs no scripts, and adds a normal uninstall entry in Settings > Apps. Up to v1.4.1 it was an IExpress package running `powershell -ExecutionPolicy Bypass` plus a VBScript launcher, a chain antivirus flags.
 
 **Manual:** Clone the repo, right-click `install.ps1` → Run with PowerShell.
 
@@ -72,7 +72,7 @@ A **Shrink...** button also appears at the bottom of the [FFmpeg Convert](https:
 
 ## Uninstall
 
-Run `uninstall.ps1` with PowerShell.
+Settings > Apps > Shrink Menu > Uninstall. For a manual install, run `uninstall.ps1` with PowerShell.
 
 ## Build the exe yourself
 
@@ -80,7 +80,7 @@ Run `uninstall.ps1` with PowerShell.
 build.cmd
 ```
 
-Requires `iexpress.exe` (built into Windows). ImageMagick on PATH regenerates the icon automatically.
+Requires Inno Setup 6 (`winget install JRSoftware.InnoSetup`). The launcher is compiled with the in-box C# compiler. The build signs everything with Azure Artifact Signing; set `NOSIGN=1` to build unsigned. ImageMagick on PATH regenerates the icon automatically.
 
 ## More tools like this
 

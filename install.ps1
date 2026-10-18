@@ -1,7 +1,8 @@
 # install.ps1 -- Register Shrink context menu entries (no admin required)
 # Run: powershell -ExecutionPolicy Bypass -File install.ps1
+# The one-click installer (ShrinkMenu-Install.exe) does the same without PowerShell.
 
-$launcherPath = Join-Path $PSScriptRoot "launcher.vbs"
+$launcherPath = Join-Path $PSScriptRoot "build\ShrinkMenu.exe"
 $scriptPath   = Join-Path $PSScriptRoot "shrink.ps1"
 
 if (-not (Test-Path $scriptPath)) {
@@ -9,8 +10,15 @@ if (-not (Test-Path $scriptPath)) {
     exit 1
 }
 if (-not (Test-Path $launcherPath)) {
-    Write-Host "ERROR: launcher.vbs not found in $PSScriptRoot" -ForegroundColor Red
-    exit 1
+    # Compile the launcher with the in-box .NET Framework compiler (no extra install).
+    $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    if (-not (Test-Path $csc)) { $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+    New-Item -ItemType Directory -Path (Split-Path $launcherPath) -Force | Out-Null
+    & $csc /nologo /target:winexe /optimize+ "/win32icon:$(Join-Path $PSScriptRoot 'shrink.ico')" /r:Microsoft.CSharp.dll "/out:$launcherPath" (Join-Path $PSScriptRoot "launcher\ShrinkMenuLauncher.cs")
+    if (-not (Test-Path $launcherPath)) {
+        Write-Host "ERROR: could not build $launcherPath" -ForegroundColor Red
+        exit 1
+    }
 }
 
 Write-Host "Shrink Menu -- Installer" -ForegroundColor Yellow
@@ -71,7 +79,7 @@ $menuName  = "ShrinkMenu"
 $menuLabel = "Shrink..."
 $icoPath   = Join-Path $PSScriptRoot "shrink.ico"
 $menuIcon  = if (Test-Path $icoPath) { "$icoPath,0" } else { "shell32.dll,23" }
-$cmd       = "wscript.exe `"$launcherPath`" `"%1`""
+$cmd       = "`"$launcherPath`" `"%1`""
 
 foreach ($ext in $extensions) {
     $regPath = "HKCU:\Software\Classes\SystemFileAssociations\$ext\shell\$menuName"

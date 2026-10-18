@@ -1,2 +1,6 @@
 build_temp.sed
 *.tmp
+*.exe
+
+# Launcher build output
+build/
